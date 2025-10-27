@@ -7,19 +7,19 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
   :root{
-    --g1:#4d4d4d;           /* licht grijs */
-    --g2:#303030;           /* donker grijs */
-    --y:#e3b021;            /* geel */
+    --g1:#4d4d4d;
+    --g2:#303030;
+    --y:#e3b021;
     --text:#f3f3f3;
     --muted:#d0d0d0;
-    --dock-w:360px;         /* breedte dock */
+    --dock-w:360px;
   }
 
   html,body,#map{height:100%;margin:0}
   body{font-family:system-ui,Segoe UI,Roboto,Arial;background:#1b1b1b;color:var(--text)}
   .app{display:flex;height:100vh;overflow:hidden;position:relative}
 
-  /* ===== Linker dock (inklapbaar) ===== */
+  /* Dock */
   .dock{
     width:var(--dock-w); min-width:320px; max-width:420px;
     padding:12px; gap:12px; box-sizing:border-box;
@@ -29,11 +29,10 @@
   }
   .dock.collapsed{ width:0; min-width:0; padding:0; overflow:hidden; }
 
-  /* ===== Zijkant-lip: BUITEN de dock, gepositioneerd op .app ===== */
+  /* Lip */
   .dock-tab{
-    position:absolute;            /* t.o.v. .app */
-    top:50%; transform:translateY(-50%);
-    left:calc(var(--dock-w) - 12px); /* iets overlappen bij open menu */
+    position:absolute; top:50%; transform:translateY(-50%);
+    left:calc(var(--dock-w) - 12px);
     z-index:930;
     width:24px; height:52px;
     background:var(--g2);
@@ -43,18 +42,12 @@
     box-shadow:0 6px 16px rgba(0,0,0,.35);
     cursor:pointer;
     display:flex; align-items:center; justify-content:center;
-    font-weight:900;
-    pointer-events:auto;
+    font-weight:900; pointer-events:auto;
   }
-  /* Als dock dicht is (broertje links), schuift lip naar x=0 en krijgt rand */
-  .dock.collapsed + .dock-tab{
-    left:0;
-    border-left:1px solid #222;
-    border-radius:10px;
-  }
+  .dock.collapsed + .dock-tab{ left:0; border-left:1px solid #222; border-radius:10px; }
   .dock-tab .chev{ font-size:16px; line-height:1; }
 
-  /* ===== FR24-achtige card ===== */
+  /* Card */
   .card{
     background:linear-gradient(180deg,var(--g1) 0%,var(--g2) 100%);
     border:1px solid #262626; border-radius:12px;
@@ -71,7 +64,7 @@
   .card .collapse{margin-left:8px;background:transparent;border:0;color:#cfcfcf;font-size:16px;cursor:pointer}
   .card .collapse:hover{color:#fff}
 
-  /* Modi */
+  /* Modes */
   .modes{display:flex;gap:8px;flex-wrap:wrap;padding:10px 12px}
   .mode-btn{
     background:#3b3b3b;border:1px solid #2a2a2a;color:var(--text);
@@ -98,13 +91,12 @@
   .btn.primary{background:linear-gradient(180deg,#4a4a4a,#3a3a3a)}
   .btn.yellow{ color:#161616; box-shadow: inset 0 0 0 999px var(--y); border:1px solid #6a5713; background:#5e4d11; }
 
-  .field{display:flex;gap:8px}
-  .field input{
-    flex:1;min-width:0;background:#2f2f2f;color:var(--text);
-    border:1px solid #232323;border-radius:10px;padding:10px 12px
-  }
+  /* Slider */
+  .slider-wrap{display:flex;flex-direction:column;gap:6px}
+  .slider-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted)}
+  input[type="range"]{width:100%}
 
-  /* ===== Kaart + overlays ===== */
+  /* Map */
   #map{flex:1;position:relative;z-index:800}
   .leaflet-pane.leaflet-tile-pane{ filter:brightness(0.62) saturate(0.9) contrast(0.95); }
   .leaflet-pane.leaflet-tile-pane::after{ content:"";position:absolute;inset:0;background:rgba(10,10,10,.35);pointer-events:none; }
@@ -153,17 +145,30 @@
         <button id="addRandom" class="btn primary">Spawn at center</button>
         <button id="clearAll" class="btn">Clear map</button>
 
-        <button id="randomFillerBtn" class="btn yellow row-2">Random Filler</button>
+        <!-- 2 knoppen -->
+        <button id="randomFillerBtn" class="btn yellow row-2">Random filler</button>
+        <button id="selectedFillerBtn" class="btn yellow row-2">Selected filler</button>
 
-        <div class="field row-2">
-          <input id="selectedRadius" placeholder="Radius (bv. 2000 of 2km)" value="2000"/>
-          <button id="selectedFillerBtn" class="btn yellow">Selected fill radius</button>
+        <!-- Eén radius schuifje voor beide -->
+        <div class="slider-wrap row-2">
+          <div class="slider-head">
+            <span>Radius</span>
+            <span id="radiusLabel">2000 m</span>
+          </div>
+          <!-- 50 m – 2500 km -->
+          <input id="radiusSlider" type="range" min="50" max="2500000" step="50" value="2000" />
+        </div>
+
+        <!-- Show Center point -->
+        <div class="row-2" style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="showCenterPoint"/>
+          <label for="showCenterPoint" style="user-select:none;cursor:pointer">Show Center point</label>
         </div>
       </div>
     </section>
   </aside>
 
-  <!-- Lip staat BUITEN de dock zodat hij nooit verdwijnt -->
+  <!-- Lip -->
   <button id="dockTab" class="dock-tab" title="Menu open/dicht">
     <span class="chev">◀</span>
   </button>
@@ -195,14 +200,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-/* ===== UI: dock inklappen/uitklappen met vaste lip ===== */
+/* Dock inklappen met vaste lip */
 (function(){
   const dock = document.getElementById('dock');
-  const collapseBtn = document.getElementById('collapseDock'); // in header
-  const dockTab = document.getElementById('dockTab');          // lip (buiten dock)
+  const collapseBtn = document.getElementById('collapseDock');
+  const dockTab = document.getElementById('dockTab');
   let map;
-
-  // wordt gezet na Leaflet init
   window.__setMap = (m)=>{ map = m; };
 
   function setChevron(){
@@ -215,7 +218,7 @@
 
   collapseBtn.addEventListener('click', collapse);
   dockTab.addEventListener('click', toggle);
-  setChevron(); // init
+  setChevron();
 })();
 </script>
 
@@ -245,7 +248,7 @@
     {file:'img/fatbike.png',name:'Fatbike',kind:'fatbike'},
     {file:'img/santa.png',name:'Santa',kind:'plane'},
     {file:'img/satellite.png',name:'Satellite',kind:'satellite'},
-    {file:'img/heli1.gif',name:'Heli1',kind:'heli'},          /* NIEUW */
+    {file:'img/heli1.gif',name:'Heli1',kind:'heli'},
     makePlane('img/v1.png','v1'),makePlane('img/v2.png','v2'),makePlane('img/v3.png','v3'),
     makePlane('img/v4.png','v4'),makePlane('img/v5.png','v5'),makePlane('img/v6.png','v6'),
     makePlane('img/v7.png','v7'),makePlane('img/v8.png','v8'),makePlane('img/v9.png','v9'),
@@ -271,6 +274,8 @@
   const map=L.map('map',{center:[52.31,4.77],zoom:8,worldCopyJump:true,keyboard:false});
   window.__setMap(map);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+
+  /* Drag & drop uit het menu naar de kaart */
   const mapEl=map.getContainer();
   mapEl.addEventListener('dragover',e=>{e.preventDefault(); e.dataTransfer.dropEffect='copy';});
   mapEl.addEventListener('drop',e=>{
@@ -283,13 +288,113 @@
   });
 
   /* Buttons */
-  document.getElementById('addRandom').onclick=()=>{
+  function spawnAtCenter(){
     const it=chosenIcon||ICONS[0];
     spawnWithCurrentMode({icon:it.file,title:it.name,kind:it.kind}, map.getCenter());
-  };
+  }
+  document.getElementById('addRandom').onclick=spawnAtCenter;
   document.getElementById('clearAll').onclick=()=>Object.keys(active).forEach(id=>removeObj(id));
-  document.getElementById('randomFillerBtn').onclick=()=>fillWithTrafficRandom();
-  document.getElementById('selectedFillerBtn').onclick=()=>fillWithTrafficSelectedCircle();
+  document.getElementById('randomFillerBtn').onclick=()=>fillWithTrafficRandomRadius();
+  document.getElementById('selectedFillerBtn').onclick=()=>fillWithTrafficSelectedRadius();
+
+  /* Radius slider (gedeeld) + label */
+  const radiusSlider = document.getElementById('radiusSlider');
+  const radiusLabel  = document.getElementById('radiusLabel');
+  const fmtRadius = (m)=> m>=1000 ? (Math.round(m/100)/10)+' km' : (Math.round(m)+' m');
+  function getRadiusMeters(){
+    const v = parseInt(radiusSlider.value,10);
+    const clamped = isNaN(v) ? 2000 : Math.max(50, Math.min(2500000, v));
+    return clamped;
+  }
+  function setRadiusMeters(v){
+    const clamped = Math.max(50, Math.min(2500000, v|0));
+    radiusSlider.value = clamped;
+    updateRadiusLabel();
+    updateCenterOverlay();
+  }
+  function updateRadiusLabel(){ radiusLabel.textContent = fmtRadius(getRadiusMeters()); }
+  radiusSlider.addEventListener('input', ()=>{ updateRadiusLabel(); updateCenterOverlay(); });
+  updateRadiusLabel();
+
+  /* Center overlay (cirkel + punt) */
+  const showCenterChk = document.getElementById('showCenterPoint');
+  let centerCircle=null, centerDot=null;
+
+  function ensureCenterLayers(){
+    if(!centerCircle){
+      centerCircle = L.circle(map.getCenter(), {
+        radius: getRadiusMeters(),
+        color: '#e3b021',
+        weight: 2,
+        fill: false,
+        opacity: 0.9
+      });
+    }
+    if(!centerDot){
+      centerDot = L.circleMarker(map.getCenter(), {
+        radius: 3,
+        color: '#e3b021',
+        weight: 2,
+        fill: true,
+        fillOpacity: 1
+      });
+    }
+  }
+  function showCenterOverlay(on){
+    if(on){
+      ensureCenterLayers();
+      centerCircle.addTo(map);
+      centerDot.addTo(map);
+      updateCenterOverlay();
+    }else{
+      if(centerCircle) map.removeLayer(centerCircle);
+      if(centerDot)    map.removeLayer(centerDot);
+    }
+  }
+  function updateCenterOverlay(){
+    if(!centerCircle || !map.hasLayer(centerCircle)) return;
+    const c = map.getCenter();
+    centerCircle.setLatLng(c);
+    centerCircle.setRadius(getRadiusMeters());
+    if(centerDot && map.hasLayer(centerDot)) centerDot.setLatLng(c);
+  }
+
+  showCenterChk.addEventListener('change', ()=> showCenterOverlay(showCenterChk.checked));
+  map.on('move', updateCenterOverlay); // volg het kaart-centrum live
+
+  /* ====== NIEUW: Keyboard acties ====== */
+  // 1) Spatie = Spawn at center (als je in een invoerveld zit, negeren)
+  window.addEventListener('keydown', (e)=>{
+    const tag=(e.target||{}).tagName||'';
+    const typing = /INPUT|TEXTAREA|SELECT/.test(tag);
+    if(!typing && (e.code==='Space' || e.key===' ')){
+      e.preventDefault();
+      spawnAtCenter();
+    }
+  });
+
+  // 2) F ingedrukt + muis slepen = radius aanpassen (Photoshop-achtig)
+  let fDragActive=false;
+  const PX_TO_METERS = 250; // 1px = 250 m (tune gerust)
+  window.addEventListener('keydown', (e)=>{
+    if((e.key==='f' || e.key==='F') && !fDragActive){
+      fDragActive=true;
+      document.body.style.cursor='ew-resize';
+    }
+  });
+  window.addEventListener('keyup', (e)=>{
+    if((e.key==='f' || e.key==='F') && fDragActive){
+      fDragActive=false;
+      document.body.style.cursor='';
+    }
+  });
+  window.addEventListener('mousemove', (e)=>{
+    if(!fDragActive) return;
+    const delta = e.movementX || 0;     // alleen horizontale beweging
+    if(delta===0) return;
+    const newVal = getRadiusMeters() + delta * PX_TO_METERS;
+    setRadiusMeters(newVal);
+  });
 
   /* State & helpers */
   const active={}, R=6371000; let seq=1; let selectedId=null;
@@ -351,16 +456,14 @@
           else { o.straightSpeedMS=80+Math.random()*120; }
         }
       } else if(o.kind==='heli'){
-        // Helicopter: loiter rond eigen centrum
         const c=o.marker.getLatLng();
         o.autoModel='heli';
         o.heliCenter={lat:c.lat,lng:c.lng};
         o.heliAngle=Math.random()*360;
-        o.heliRadiusKm=0.3+Math.random()*0.5;   // 300–800 m
-        o.heliTurnDps=25+Math.random()*25;      // 25–50 deg/s
+        o.heliRadiusKm=0.3+Math.random()*0.5;
+        o.heliTurnDps=25+Math.random()*25;
         o.heliJitter=0;
       } else {
-        // route-gebonden objecten
         o.autoModel='route';
         const p=o.marker.getLatLng();
         if(o.kind==='cart') buildRoadLoop(o,'cart');
@@ -389,28 +492,23 @@
     else if(data.kind==='satellite'){route=makeLoopRoute(ll,120,96,.1);}
     else if(data.kind==='balloon'){route=makeLoopRoute(ll,12,56,.6);}
     else{route=[[ll.lat,ll.lng],destPoint(ll.lat,ll.lng,Math.random()*360,500)];}
-    const noRot=(data.kind==='balloon'||data.kind==='satellite'||data.kind==='fatbike'); // heli draait wél mee
+
+    const noRot=(data.kind==='balloon'||data.kind==='satellite'||data.kind==='fatbike');
     const extra=data.kind==='balloon'?'balloon':(data.kind==='satellite'?'sat':'');
-    const marker=L.marker(ll,{icon:divIcon(data.icon,0,{noRotate:noRot,extraClass:extra}),draggable:true,title:data.title}).addTo(map);
+
+    // >>> Belangrijk: markers NIET interactief maken zodat navigeren altijd kan
+    const marker=L.marker(ll,{
+      icon:divIcon(data.icon,0,{noRotate:noRot,extraClass:extra}),
+      draggable:false,
+      interactive:false,   // blokkeert clicks/hover/drag op de marker
+      keyboard:false,
+      title:data.title
+    }).addTo(map);
+
     active[id]={id,kind:data.kind||'plane',marker,route,step:0,t:0,styleKey:prov,speedScale:s.base||1,data:{icon:data.icon,title:data.title},
       paused:false,manual:null,spawnedWithManual:false,prevAutoStyle:'normal',spinCenter:null,spinRadiusKm:0,spinAngle:0,spinSpeedDps:0,_drunkT:0,
       heading:0,autoModel:null,straightHeading:0,straightSpeedMS:120,styleLocked:false,spawnStyle:null,isV7:(data.title?.toLowerCase()==='v7')||/v7\.png$/i.test(data.icon),_roadBase:undefined};
-    marker.on('click',()=>selectObj(id));
-    marker.on('dragstart',()=>selectObj(id));
-    marker.on('dragend',ev=>{
-      const p=ev.target.getLatLng(); const o=active[id];
-      if(o.styleKey==='static'){ o.route=[[p.lat,p.lng]]; }
-      else if(o.styleKey==='drunk'){ o.spinCenter={lat:p.lat,lng:p.lng}; }
-      else if(o.styleKey==='normal'){
-        if(o.kind==='plane'){ o.route=[[p.lat,p.lng], destPoint(p.lat,p.lng,o.straightHeading||0,500)]; }
-        else if(o.kind==='cart'){ o.marker.setLatLng(p); buildRoadLoop(o,'cart'); }
-        else if(o.kind==='fatbike'){ o.marker.setLatLng(p); buildRoadLoop(o,'fatbike'); }
-        else if(o.kind==='satellite'){ o.route=makeLoopRoute(p,120,96,.1); }
-        else if(o.kind==='balloon'){ o.route=makeLoopRoute(p,12,56,.6); }
-        else if(o.kind==='heli'){ o.heliCenter={lat:p.lat,lng:p.lng}; }
-      }
-      o.step=0; o.t=0;
-    });
+
     active[id].timer=setInterval(()=>{ if(!active[id].paused) tick(id,1/20); }, 50);
     return id;
   }
@@ -424,7 +522,7 @@
   function tick(id,dt){
     const o=active[id]; if(!o) return;
 
-    /* MANUAL */
+    // MANUAL (alleen als zo gespawned; markers zijn toch niet interactief)
     if(o.mode==='manual'&&o.manual){
       if(!(o.kind==='plane'&&o.spawnedWithManual)){ applyStyleTo(o,o.prevAutoStyle||'normal',true); return; }
       const m=o.manual,acc=(keys.w||keys.arrowUp?8:0)+(keys.s||keys.arrowDown?-10:0);
@@ -437,7 +535,7 @@
       if(selectedId===id) refreshPanel(); return;
     }
 
-    /* DRUNK cirkel */
+    // DRUNK
     if(o.styleKey==='drunk'&&o.spinCenter){
       o._drunkT+=dt;
       if(o._drunkT>3){
@@ -455,10 +553,10 @@
       if(selectedId===id) refreshPanel(); return;
     }
 
-    /* STATIC */
+    // STATIC
     if(o.styleKey==='static'){ o.data.spd=0; if(selectedId===id) refreshPanel(); return; }
 
-    /* HELI loiter */
+    // HELI loiter
     if(o.styleKey==='normal' && o.kind==='heli' && o.autoModel==='heli'){
       o.heliJitter += dt;
       if(o.heliJitter > 2){
@@ -467,16 +565,16 @@
         o.heliTurnDps = Math.max(15, Math.min(60, o.heliTurnDps + (Math.random()-0.5)*6));
       }
       o.heliAngle = (o.heliAngle + o.heliTurnDps * dt) % 360;
-      const pos = destPoint(o.heliCenter.lat, o.heliCenter.lng, o.heliAngle, o.heliRadiusKm * 1000);
+      const pos = destPoint(o.heliCenter?.lat||o.marker.getLatLng().lat, o.heliCenter?.lng||o.marker.getLatLng().lng, o.heliAngle, o.heliRadiusKm * 1000);
       const tang = (o.heliAngle + 90) % 360;
       o.marker.setLatLng(pos); o.heading=tang; updateIcon(o);
       o.data.alt = 500 + Math.round(50 * Math.sin(o.heliAngle * Math.PI / 90));
-      o.data.spd = 60; // display
+      o.data.spd = 60;
       o.data.trk = Math.round(tang);
       if(selectedId===id) refreshPanel(); return;
     }
 
-    /* PLANES straight */
+    // PLANES straight
     if(o.styleKey==='normal'&&o.kind==='plane'){
       const c=o.marker.getLatLng(),v=o.straightSpeedMS*(o.speedScale||1);
       const nx=destPoint(c.lat,c.lng,o.straightHeading,v*dt);
@@ -485,17 +583,17 @@
       if(selectedId===id) refreshPanel(); return;
     }
 
-    /* ROUTE-volgers (balloon/sat/cart/fatbike) */
+    // ROUTE-volgers
     const r=o.route; if(!r||r.length<2) return;
     let base;
-    if(o.kind==='balloon') base=0.04;                    /* LANGZAMER BALLON */
+    if(o.kind==='balloon') base=0.04;
     else if(o.kind==='satellite') base=0.8;
     else if(o.kind==='cart') base=o._roadBase??0.10;
     else if(o.kind==='fatbike') base=o._roadBase??0.035;
     else base=0.5;
     o.t+=dt*base*(o.speedScale||1); while(o.t>=1){ o.step=(o.step+1)%(r.length-1); o.t-=1; }
-    const a=r[o.step], b=r[o.step+1], pos=lerp(a,b,o.t), hdg=bearing(a,b);
-    o.marker.setLatLng(pos); o.heading=hdg; updateIcon(o);
+    const a=r[o.step], b=r[o.step+1], pos2=lerp(a,b,o.t), hdg=bearing(a,b);
+    o.marker.setLatLng(pos2); o.heading=hdg; updateIcon(o);
 
     if(o.kind==='balloon'){ o.data.alt=3000+Math.round(400*Math.sin((o.step+o.t)/r.length*Math.PI*2)); o.data.spd=8+Math.round(4*Math.cos((o.step+o.t)/r.length*Math.PI)); }
     else if(o.kind==='satellite'){ o.data.alt=250000; o.data.spd=17500; }
@@ -547,7 +645,9 @@
       e.preventDefault();
       if(k==='w') keys.w=true; if(k==='a') keys.a=true; if(k==='s') keys.s=true; if(k==='d') keys.d=true;
       if(k==='ArrowUp') keys.arrowUp=true; if(k==='ArrowDown') keys.arrowDown=true; if(k==='ArrowLeft') keys.arrowLeft=true; if(k==='ArrowRight') keys.arrowRight=true;
-    }else if(k===' '){ if(!(o.mode==='manual' && o.kind==='plane' && o.spawnedWithManual)) return; e.preventDefault(); o.manual&&(o.manual.speedMS=0);
+    }else if(k===' '){
+      // Space handling voor manual brake blijft maar wordt overschaduwd door globale spawn (boven)
+      if(!(o.mode==='manual' && o.kind==='plane' && o.spawnedWithManual)) return; e.preventDefault(); o.manual&&(o.manual.speedMS=0);
     }else if(k==='Escape'){ if(o.mode==='manual'){ applyStyleTo(o, o.prevAutoStyle || 'normal', true); } }
   });
   window.addEventListener('keyup',e=>{
@@ -558,40 +658,48 @@
 
   function randomBetween(a,b){ return a + Math.random()*(b-a); }
   function fillerCountFromZoom(){ const z=map.getZoom(); return Math.max(8, Math.min(50, Math.floor((z-3)*5))); }
-  function parseRadiusMeters(s){ if(!s) return 2000; const m=String(s).trim().toLowerCase().replace(',', '.'); const n=parseFloat(m); if(isNaN(n)) return 2000; return /km/.test(m) ? Math.max(50, Math.min(100000, n*1000)) : Math.max(50, Math.min(100000, n)); }
 
-  function fillWithTrafficRandom(){
-    const b=map.getBounds(), sw=b.getSouthWest(), ne=b.getNorthEast(); const count=fillerCountFromZoom();
+  /* Random filler op radius rond center */
+  function fillWithTrafficRandomRadius(){
+    const count=fillerCountFromZoom();
+    const r=getRadiusMeters();
+    const c=map.getCenter();
+
     const normalPlanes=ICONS.filter(x=>x.kind==='plane' && !['cart','fatbike','santa','satellite','balloon'].includes(x.name.toLowerCase()));
     const v7=ICONS.find(x=>x.name==='v7');
-    const heli=ICONS.find(x=>x.name==='Heli1');  /* zeldzame heli */
+    const heli=ICONS.find(x=>x.name==='Heli1');
 
     for(let i=0;i<count;i++){
-      const lat=randomBetween(sw.lat, ne.lat), lng=randomBetween(sw.lng, ne.lng);
-      let choice=null; const r=Math.random();
-      if(r<0.02 && v7){               // v7 ~2%
-        choice=v7;
-      }else if(r<0.03 && heli){       // Heli1 ~1%
-        choice=heli;
-      }else{
+      const th=Math.random()*360;
+      const d=Math.sqrt(Math.random())*r;         // uniforme dichtheid in cirkel
+      const [lat,lng]=destPoint(c.lat,c.lng,th,d);
+
+      let choice=null; const rr=Math.random();
+      if(rr<0.02 && v7){ choice=v7; }
+      else if(rr<0.03 && heli){ choice=heli; }
+      else{
         const pool=normalPlanes.filter(p=>p!==v7);
         choice=pool[Math.floor(Math.random()*pool.length)];
       }
+
       const id=addObject({icon:choice.file,title:choice.name,kind:choice.kind}, L.latLng(lat,lng));
       const o=active[id];
       o.styleLocked=true; o.spawnStyle='normal'; o.spawnedWithManual=false; o.prevAutoStyle='normal';
       if(o.kind==='plane'){ o.speedScale=randomBetween(0.75,1.50); if(o.isV7){ o.speedScale=Math.max(o.speedScale,1.25); } }
-      else if(o.kind==='heli'){ o.speedScale=1; } // heli loiter fixed
+      else if(o.kind==='heli'){ o.speedScale=1; }
       applyStyleTo(o,'normal',true);
     }
   }
 
-  function fillWithTrafficSelectedCircle(){
+  /* Selected filler gebruikt dezelfde radius */
+  function fillWithTrafficSelectedRadius(){
     if(!chosenIcon){ alert('Selecteer eerst een object in het menu.'); return; }
     if((chosenIcon.name||'').toLowerCase()==='balloon'){ alert('Balloon is uitgeschakeld voor fillers.'); return; }
+
     const count=fillerCountFromZoom();
-    const r=parseRadiusMeters(document.getElementById('selectedRadius').value);
+    const r=getRadiusMeters();
     const c=map.getCenter();
+
     for(let i=0;i<count;i++){
       const th=Math.random()*360;
       const d=Math.sqrt(Math.random())*r;
