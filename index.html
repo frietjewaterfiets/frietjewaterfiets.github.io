@@ -1,13 +1,76 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8" />
 <title>frietjewaterfiets</title>
 
-<h1>frietjewaterfiets</h1>
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#000;
+    --fg:#fff;
+    --muted:rgba(255,255,255,.7);
+    --line:rgba(255,255,255,.35);
+  }
 
-<!-- Add your clickable words (links) below -->
-<p>
-  <a href="FlightRadarSimulator/index.html">FlightRadarSimulator</a>
-  <!-- Duplicate the next pattern to add more: -->
-  <!-- <a href="/your-link">AnotherWord</a> -->
-  <!-- <a href="/something-else">SomethingElse</a> -->
-</p>
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    padding:24px;
+    background:var(--bg);
+    color:var(--fg);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+
+  h1{
+	margin: 0 0 32px 0;
+    font-size:22px;
+  }
+
+  nav{
+    margin-bottom: 48px;
+  }
+
+  nav a{
+    color:var(--fg);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    margin-right: 16px;
+  }
+
+  nav a:hover{
+    background: var(--fg);
+    color: var(--bg);
+  }
+
+  footer{
+    border-top: 2px solid var(--line);
+    padding-top: 12px;
+    padding-bottom: 12px;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  footer a{
+    color:var(--fg);
+  }
+</style>
+</head>
+
+<body>
+  <h1>frietjewaterfiets</h1>
+
+  <nav>
+    <a href="FlightRadarSimulator/index.html">FlightRadarSimulator</a>
+    <a href="/PNG_FILLER/PNG_FILLER.HTML">PNG_FILLER</a>
+  </nav>
+
+  <footer>
+    <a href="https://github.com/frietjewaterfiets" target="_blank" rel="noopener">
+      frietjewaterfiets
+    </a>
+  </footer>
+</body>
+</html>
