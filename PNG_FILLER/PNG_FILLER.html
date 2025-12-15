@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PNG_FILLER</title>
+  <style>
+:root{
+  color-scheme: dark;
+  --bg:#000;
+  --fg:#fff;
+  --muted: rgba(255,255,255,.75);
+  --line: rgba(255,255,255,.35);
+  --accent:#ff00ff;
+}
+
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+
+body{
+  margin:0;
+  padding:24px;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  background:var(--bg);
+  color:var(--fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  letter-spacing:.1px;
+}
+
+a{
+  color:var(--fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+a:hover{
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.wrap{
+  width:100%;
+  max-width: 980px;
+  margin:0 auto;
+  display:grid;
+  gap:16px;
+  flex:1;
+}
+
+h1{ margin:0; font-size: 22px; letter-spacing:.2px; }
+
+.meta{ opacity:1; color:var(--muted); font-size: 13px; }
+.small{ font-size:12px; color:var(--muted); }
+
+.row{ display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+
+.panel, .desc, .log, .control{
+  border: 2px solid var(--line);
+  border-radius: 0;
+  padding:14px;
+  background: transparent;
+}
+
+.panel{ display:grid; gap:10px; }
+.panel h2{ margin:0; font-size: 13px; color:var(--muted); font-weight:600; }
+
+.controls{ display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+.control{ gap:8px; padding:8px 10px; }
+
+.drop{
+  border: 2px dashed var(--line);
+  border-radius: 0;
+  padding: 28px;
+  text-align:center;
+  transition: 120ms ease;
+  user-select:none;
+}
+.drop.drag{
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+button{
+  padding:10px 14px;
+  border-radius:0;
+  border:2px solid var(--line);
+  background:transparent;
+  color:var(--fg);
+  cursor:pointer;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  font-size: 12px;
+}
+button:hover{ border-color: var(--fg); }
+button:disabled{ opacity:.5; cursor:not-allowed; }
+
+.pill{
+  padding: 4px 10px;
+  border:2px solid var(--line);
+  border-radius:0;
+  font-size:12px;
+  color:var(--muted);
+}
+
+.log{
+  height: 220px;
+  overflow:auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+progress{
+  width:100%;
+  height: 14px;
+  background: transparent;
+  border: 2px solid var(--line);
+}
+progress::-webkit-progress-bar{ background: transparent; }
+progress::-webkit-progress-value{ background: var(--fg); }
+progress::-moz-progress-bar{ background: var(--fg); }
+
+input[type="text"]{
+  width: 140px;
+  padding: 6px 8px;
+  border-radius:0;
+  border:2px solid var(--line);
+  background:transparent;
+  color:var(--fg);
+  outline:none;
+  font-family: inherit;
+}
+input[type="text"]:focus{
+  border-color: var(--fg);
+}
+
+input[type="color"]{
+  width: 42px;
+  height: 32px;
+  border:2px solid var(--line);
+  border-radius:0;
+  background: transparent;
+  padding:0;
+}
+
+.swatches{ display:flex; flex-wrap:wrap; gap:8px; }
+.swatch{
+  width: 28px;
+  height: 28px;
+  border-radius:0;
+  border:2px solid var(--line);
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+}
+.swatch[aria-selected="true"]::after{
+  content:"";
+  position:absolute;
+  inset: 5px;
+  border:2px solid var(--fg);
+  mix-blend-mode: difference;
+}
+
+.bad{ border-color: #ff4d4d !important; }
+
+.footer{
+  width:100%;
+  max-width: 980px;
+  margin: 24px auto 0;
+  padding: 12px 0 12px;
+  border-top: 2px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Bulk fill PNG's with solid color</h1>
+
+    <div class="desc">
+      <div style="font-weight:600;">What this tool does</div>
+      <div class="meta">
+        Drop transparent PNG files in bulk. For every image, all <b>non-transparent pixels</b> are replaced with your chosen color
+        (transparency is preserved). Then you can download everything as a single ZIP.
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Color</h2>
+      <div class="controls">
+        <div class="control">
+          <span class="meta">Picker</span>
+          <input id="colorPicker" type="color" value="#ff00ff" />
+        </div>
+
+        <div class="control">
+          <span class="meta">HEX</span>
+          <input id="hexInput" type="text" value="#FF00FF" inputmode="text" spellcheck="false" />
+        </div>
+      </div>
+
+      <div class="swatches" id="swatches" aria-label="color palette"></div>
+    </div>
+
+    <div id="drop" class="drop">
+      <div style="font-size:18px; font-weight:600;">Drop your PNGs here</div>
+      <div class="meta">or click to choose files.</div>
+      <input id="file" type="file" accept="image/png" multiple style="display:none" />
+      <div class="small" style="margin-top:10px;">
+        Rule: pixels with alpha &gt; 0 become the chosen color. Fully transparent pixels stay transparent.
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="clear">Clear</button>
+      <button id="start" disabled>Process & Download ZIP</button>
+      <span class="pill" id="count">0 files</span>
+      <span class="pill" id="ok">0 ok</span>
+      <span class="pill" id="fail">0 failed</span>
+    </div>
+
+    <div>
+      <progress id="prog" value="0" max="1"></progress>
+      <div class="meta" id="status">No files loaded.</div>
+    </div>
+
+    <div class="log" id="log" aria-label="log"></div>
+
+    <div class="small">
+      The ZIP is built in memory. Very large batches may hit your browser memory limits.
+    </div>
+  </div>
+
+  <!-- JSZip -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <script>
+    const dropEl = document.getElementById('drop');
+    const fileEl = document.getElementById('file');
+    const startBtn = document.getElementById('start');
+    const clearBtn = document.getElementById('clear');
+    const logEl = document.getElementById('log');
+    const statusEl = document.getElementById('status');
+    const progEl = document.getElementById('prog');
+    const countEl = document.getElementById('count');
+    const okEl = document.getElementById('ok');
+    const failEl = document.getElementById('fail');
+
+    const colorPicker = document.getElementById('colorPicker');
+    const hexInput = document.getElementById('hexInput');
+    const swatchesEl = document.getElementById('swatches');
+
+    /** @type {File[]} */
+    let files = [];
+    let busy = false;
+
+    // Active color in RGB
+    let activeRGB = { r: 255, g: 0, b: 255 };
+    let activeHex = "#FF00FF";
+
+    const PALETTE = [
+      { name: "Magenta", hex: "#FF00FF" },
+      { name: "Cyan",    hex: "#00FFFF" },
+      { name: "Yellow",  hex: "#FFFF00" },
+      { name: "Black",   hex: "#000000" },
+      { name: "White",   hex: "#FFFFFF" },
+      { name: "Red",     hex: "#FF0000" },
+      { name: "Green",   hex: "#00FF00" },
+      { name: "Blue",    hex: "#0000FF" },
+      { name: "Orange",  hex: "#FF7A00" },
+      { name: "Purple",  hex: "#7A00FF" },
+    ];
+
+    function log(line) {
+      logEl.textContent += line + "\n";
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function setCounts(ok, fail) {
+      okEl.textContent = `${ok} ok`;
+      failEl.textContent = `${fail} failed`;
+    }
+
+    function updateUI() {
+      countEl.textContent = `${files.length} files`;
+      startBtn.disabled = busy || files.length === 0;
+      statusEl.textContent = files.length
+        ? `Ready to process ${files.length} PNG(s).`
+        : `No files loaded.`;
+    }
+
+    function addFiles(list) {
+      const incoming = Array.from(list || []);
+      const pngs = incoming.filter(f => f && f.type === "image/png" && /\.png$/i.test(f.name));
+      const skipped = incoming.length - pngs.length;
+
+      files.push(...pngs);
+
+      log(`+ Added ${pngs.length} PNG(s).` + (skipped ? ` (${skipped} skipped: not PNG)` : ""));
+      updateUI();
+    }
+
+    function clearAll() {
+      files = [];
+      logEl.textContent = "";
+      progEl.value = 0;
+      progEl.max = 1;
+      setCounts(0, 0);
+      busy = false;
+      updateUI();
+    }
+
+    // --- Color helpers ---
+    function clamp255(n){ return Math.max(0, Math.min(255, n|0)); }
+
+    function hexToRgb(hex) {
+      const h = hex.replace('#','').trim();
+      if (h.length === 3) {
+        const r = parseInt(h[0]+h[0], 16);
+        const g = parseInt(h[1]+h[1], 16);
+        const b = parseInt(h[2]+h[2], 16);
+        return { r, g, b };
+      }
+      if (h.length === 6) {
+        const r = parseInt(h.slice(0,2), 16);
+        const g = parseInt(h.slice(2,4), 16);
+        const b = parseInt(h.slice(4,6), 16);
+        return { r, g, b };
+      }
+      return null;
+    }
+
+    function normalizeHex(hex) {
+      let h = hex.trim();
+      if (!h.startsWith('#')) h = '#'+h;
+      h = h.toUpperCase();
+      const rgb = hexToRgb(h);
+      if (!rgb) return null;
+      const rr = rgb.r.toString(16).padStart(2,'0').toUpperCase();
+      const gg = rgb.g.toString(16).padStart(2,'0').toUpperCase();
+      const bb = rgb.b.toString(16).padStart(2,'0').toUpperCase();
+      return `#${rr}${gg}${bb}`;
+    }
+
+    function applyAccent(hex, rgb) {
+      activeHex = hex;
+      activeRGB = { r: clamp255(rgb.r), g: clamp255(rgb.g), b: clamp255(rgb.b) };
+      document.documentElement.style.setProperty('--accent', activeHex);
+
+      // sync inputs
+      colorPicker.value = activeHex.toLowerCase();
+      hexInput.value = activeHex;
+      hexInput.classList.remove('bad');
+      markSelectedSwatch(activeHex);
+    }
+
+    function markSelectedSwatch(hex) {
+      const kids = swatchesEl.querySelectorAll('.swatch');
+      kids.forEach(el => {
+        el.setAttribute('aria-selected', (el.dataset.hex === hex) ? 'true' : 'false');
+      });
+    }
+
+    function renderSwatches() {
+      swatchesEl.innerHTML = "";
+      for (const c of PALETTE) {
+        const btn = document.createElement('button');
+        btn.type = "button";
+        btn.className = "swatch";
+        btn.title = `${c.name} (${c.hex})`;
+        btn.style.background = c.hex;
+        btn.dataset.hex = c.hex.toUpperCase();
+        btn.setAttribute('aria-selected', 'false');
+        btn.addEventListener('click', () => {
+          const rgb = hexToRgb(c.hex);
+          applyAccent(c.hex.toUpperCase(), rgb);
+        });
+        swatchesEl.appendChild(btn);
+      }
+      markSelectedSwatch(activeHex);
+    }
+
+    colorPicker.addEventListener('input', () => {
+      const norm = normalizeHex(colorPicker.value);
+      if (!norm) return;
+      const rgb = hexToRgb(norm);
+      applyAccent(norm, rgb);
+    });
+
+    hexInput.addEventListener('input', () => {
+      const norm = normalizeHex(hexInput.value);
+      if (!norm) {
+        hexInput.classList.add('bad');
+        return;
+      }
+      const rgb = hexToRgb(norm);
+      applyAccent(norm, rgb);
+    });
+
+    // --- Drag & drop ---
+    ['dragenter','dragover'].forEach(ev => {
+      dropEl.addEventListener(ev, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropEl.classList.add('drag');
+      });
+    });
+    ['dragleave','drop'].forEach(ev => {
+      dropEl.addEventListener(ev, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropEl.classList.remove('drag');
+      });
+    });
+    dropEl.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      if (!dt) return;
+      addFiles(dt.files);
+    });
+
+    dropEl.addEventListener('click', () => fileEl.click());
+    fileEl.addEventListener('change', () => {
+      addFiles(fileEl.files);
+      fileEl.value = "";
+    });
+
+    clearBtn.addEventListener('click', clearAll);
+
+    function addFilledSuffix(filename) {
+      // "a.png" -> "a_filled.png"
+      // "a.b.PNG" -> "a.b_filled.PNG"
+      const m = filename.match(/^(.*)(\.png)$/i);
+      if (!m) return filename + "_filled.png";
+      return m[1] + "_filled" + m[2];
+    }
+
+    async function fileToImageBitmap(file) {
+      return await createImageBitmap(file);
+    }
+
+    async function fillToPngBlob(bitmap) {
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(bitmap, 0, 0);
+
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = img.data;
+
+      const R = activeRGB.r, G = activeRGB.g, B = activeRGB.b;
+
+      for (let i = 0; i < data.length; i += 4) {
+        const a = data[i + 3];
+        if (a !== 0) {
+          data[i] = R;
+          data[i + 1] = G;
+          data[i + 2] = B;
+        }
+      }
+
+      ctx.putImageData(img, 0, 0);
+
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      return blob;
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    async function yieldToUI() {
+      await new Promise(r => setTimeout(r, 0));
+    }
+
+    startBtn.addEventListener('click', async () => {
+      if (busy || files.length === 0) return;
+
+      const norm = normalizeHex(hexInput.value);
+      if (!norm) {
+        hexInput.classList.add('bad');
+        log("✗ Invalid HEX color. Example: #FF00FF");
+        return;
+      }
+
+      busy = true;
+      updateUI();
+      setCounts(0, 0);
+      progEl.value = 0;
+      progEl.max = files.length;
+
+      const zip = new JSZip();
+      let ok = 0, fail = 0;
+
+      log(`Starting: ${files.length} file(s)`);
+      log(`Color: ${activeHex} (RGB ${activeRGB.r},${activeRGB.g},${activeRGB.b})`);
+      statusEl.textContent = "Processing…";
+
+      // sequential (keeps memory spikes lower)
+      for (let idx = 0; idx < files.length; idx++) {
+        const f = files[idx];
+        const outName = addFilledSuffix(f.name);
+
+        try {
+          const bmp = await fileToImageBitmap(f);
+          const outBlob = await fillToPngBlob(bmp);
+          bmp.close?.();
+
+          // PNG already compressed -> STORE is often faster
+          zip.file(outName, outBlob, { binary: true, compression: "STORE" });
+
+          ok++;
+          log(`✓ ${f.name} → ${outName}`);
+        } catch (e) {
+          fail++;
+          log(`✗ ${f.name} (error: ${e?.message || e})`);
+        }
+
+        progEl.value = idx + 1;
+        statusEl.textContent = `Processed: ${idx + 1}/${files.length} (ok: ${ok}, failed: ${fail})`;
+
+        if ((idx + 1) % 10 === 0) await yieldToUI();
+      }
+
+      setCounts(ok, fail);
+
+      try {
+        statusEl.textContent = "Building ZIP…";
+        log("Building ZIP…");
+
+        const zipBlob = await zip.generateAsync({
+          type: "blob",
+          compression: "STORE",
+          streamFiles: true
+        });
+
+        const zipName = `filled_${activeHex.replace('#','')}_${new Date().toISOString().replace(/[:.]/g,'-')}.zip`;
+        downloadBlob(zipBlob, zipName);
+        log(`Done. Downloaded: ${zipName}`);
+        statusEl.textContent = `Done. ZIP downloaded (${ok} ok, ${fail} failed).`;
+      } catch (e) {
+        log(`✗ ZIP generation failed: ${e?.message || e}`);
+        statusEl.textContent = "ZIP generation failed (see log).";
+      } finally {
+        busy = false;
+        updateUI();
+      }
+    });
+
+    // init
+    renderSwatches();
+    applyAccent(activeHex, activeRGB);
+    updateUI();
+  </script>
+  <footer class="footer">
+    <a href="https://github.com/frietjewaterfiets" target="_blank" rel="noopener">frietjewaterfiets</a>
+  </footer>
+
+</body>
+</html>
