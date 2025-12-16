@@ -1,0 +1,1352 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NOISE_LAB</title>
+  <style>
+:root{
+  color-scheme: dark;
+  --bg:#000;
+  --fg:#fff;
+  --muted:rgba(255,255,255,.7);
+  --line:rgba(255,255,255,.35);
+  --line2:rgba(255,255,255,.2);
+  --good:rgba(0,255,0,.8);
+  --bad:rgba(255,0,0,.8);
+}
+
+*{ box-sizing:border-box; }
+
+html,body{ height:100%; }
+
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  padding:24px;
+}
+
+a{
+  color:var(--fg);
+  text-decoration: underline;
+  text-underline-offset:3px;
+}
+a:hover{
+  background:var(--fg);
+  color:var(--bg);
+}
+
+h1{
+  margin:0 0 22px 0;
+  font-size:22px;
+  letter-spacing:.2px;
+}
+h2{
+  margin:0 0 12px 0;
+  font-size:14px;
+  color:var(--muted);
+  font-weight:700;
+  text-transform: uppercase;
+  letter-spacing:.6px;
+}
+
+.wrap{
+  max-width:1300px;
+  margin:0 auto;
+  display:grid;
+  gap:18px;
+}
+
+.row{
+  display:flex;
+  gap:14px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.row.nowrap{ flex-wrap:nowrap; }
+
+.spacer{ flex:1; }
+
+.panel{
+  border:1px solid var(--line);
+  padding:14px;
+}
+
+.muted{ color:var(--muted); }
+.small{ font-size:12px; }
+
+.btn{
+  background:transparent;
+  color:var(--fg);
+  border:1px solid var(--line);
+  padding:6px 10px;
+  font-family: inherit;
+  font-size:13px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.btn:hover{
+  background:var(--fg);
+  color:var(--bg);
+}
+.btn:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+.btn:disabled:hover{
+  background:transparent;
+  color:var(--fg);
+}
+
+.grid{
+  display:grid;
+  grid-template-columns: 360px 1fr 360px;
+  gap:18px;
+  align-items:start;
+}
+@media (max-width:1180px){
+  .grid{ grid-template-columns:1fr; }
+  .row.nowrap{ flex-wrap:wrap; }
+}
+
+.ctrl{
+  display:grid;
+  grid-template-columns: 1fr 92px;
+  gap:10px 12px;
+  align-items:center;
+  margin-top:10px;
+}
+.ctrl label{
+  font-size:12px;
+  color:var(--muted);
+}
+.ctrl input[type="range"]{ width:100%; }
+
+.ctrl input[type="number"],
+.ctrl select,
+.ctrl input[type="text"]{
+  width:100%;
+  background:transparent;
+  color:var(--fg);
+  border:1px solid var(--line);
+  padding:6px 8px;
+  font-family:inherit;
+  font-size:13px;
+  outline:none;
+}
+
+.ctrl input[type="checkbox"]{
+  transform: translateY(1px);
+}
+
+.ctrl .full{ grid-column:1 / -1; }
+
+.pill{
+  border:1px solid var(--line);
+  padding:8px 10px;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  justify-content:space-between;
+  margin-top:10px;
+}
+.pill code{
+  font-size:12px;
+  color:var(--muted);
+}
+
+/* ===== CANVAS ===== */
+
+.canvasWrap{
+  position:relative;
+  border:1px solid var(--line);
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  align-items:center;
+}
+
+canvas{
+  width:min(100%, 900px);
+  height:auto;
+  border:1px solid var(--line2);
+  image-rendering:pixelated;
+  background:#000;
+}
+
+/* Status overlay rechtsboven OP canvas */
+.canvasStatus{
+  position:absolute;
+  top:10px;
+  right:12px;
+  font-size:12px;
+  color:var(--muted);
+  white-space:nowrap;
+  pointer-events:none;
+  z-index:10;
+
+  background:rgba(0,0,0,.55);
+  border:1px solid var(--line2);
+  padding:4px 6px;
+}
+
+/* ===== MISC ===== */
+
+.hint{
+  border:1px dashed var(--line);
+  padding:10px;
+  width:100%;
+  font-size:12px;
+  color:var(--muted);
+  line-height:1.35;
+}
+
+.status-ok{ color:var(--good); }
+.status-bad{ color:var(--bad); }
+
+footer{
+  border-top:1px solid var(--line);
+  padding-top:12px;
+  padding-bottom:12px;
+  margin-top:28px;
+  font-size:12px;
+  color:var(--muted);
+}
+
+#perf{
+  white-space: nowrap;
+}
+  </style>
+</head>
+<body>
+		<div class="wrap">
+			<h1>NOISE_LAB</h1>
+		
+			<div class="grid">
+			<!-- LEFT: Controls -->
+			<div class="panel">
+				<h2>Generator</h2>
+		
+		<div class="row nowrap">
+		<button class="btn" id="autoBtn">Auto: off</button>
+		<button class="btn" id="loopBtn">Loop: off</button>
+		<button class="btn" id="randomBtn">Randomize</button>
+		</div>
+		
+		<div class="muted small" id="perf" style="margin-top:6px;">
+		Rendered in 0.0ms
+		</div>
+
+
+        <div class="ctrl" style="margin-top:12px;">
+          <label for="w">Breedte</label>
+          <input id="w" type="number" min="32" max="4096" step="1" value="128" />
+
+          <label for="h">Hoogte</label>
+          <input id="h" type="number" min="32" max="4096" step="1" value="128" />
+
+          <label for="scale">Scale</label>
+          <div>
+            <input id="scale" type="range" min="0.5" max="200" step="0.5" value="40" />
+            <div class="muted small" style="margin-top:6px;"><span id="scaleV">40</span></div>
+          </div>
+
+          <label for="seed">Seed</label>
+          <input id="seed" type="number" min="0" max="4294967295" step="1" value="1337" />
+
+          <label for="time">Time</label>
+          <div>
+            <input id="time" type="range" min="0" max="1000" step="0.1" value="0" />
+            <div class="muted small" style="margin-top:6px;"><span id="timeV">0.0</span></div>
+          </div>
+
+          <label for="speed">Anim speed</label>
+          <div>
+            <input id="speed" type="range" min="0" max="3" step="0.01" value="0.25" />
+            <div class="muted small" style="margin-top:6px;"><span id="speedV">0.25</span></div>
+          </div>
+
+          <div class="full pill">
+            <div>
+              <div style="font-size:12px;color:var(--muted)">Tip</div>
+              <code>Shift+drag</code> op canvas = pan · <code>Wheel</code> = zoom
+            </div>
+            <button class="btn" id="resetViewBtn" type="button">Reset view</button>
+          </div>
+        </div>
+
+        <div class="pill" style="margin-top:12px;">
+          <div class="muted small">
+            2 layers + blend modes + warp + tiling + palettes + effecten.
+          </div>
+          <button class="btn" id="presetBtn" type="button">Preset: Cinematic</button>
+        </div>
+
+		<div class="hint" style="margin-top:12px;">
+		<strong>Sequence export:</strong> time → 0, records frames <code>1.jpg</code> through <code>1000.jpg</code>.
+		Press <strong>Stop</strong> to stop earlier (you’ll then receive a ZIP with whatever has already been recorded).
+		</div>
+		
+      </div>
+
+      <!-- CENTER: Canvas -->
+	<div class="panel">
+	<h2>Canvas</h2>
+	
+	<div class="canvasWrap">
+		<canvas id="c" width="128" height="128"></canvas>
+		
+		<div class="row" style="width:100%;">
+		<button class="btn" id="seqBtn">Export Sequence ZIP</button>
+		<button class="btn" id="downloadJpgBtn">Download Single JPG</button>
+		<div class="spacer"></div>
+		<span class="muted small" id="pxInfo">128×128</span>
+		</div>
+	</div>
+	</div>
+	
+
+      <!-- RIGHT: Layers + Effects + Export -->
+      <div class="panel">
+        <h2>Layers</h2>
+
+        <div class="pill">
+          <div>
+            <div style="font-size:12px;color:var(--muted)">Blend</div>
+            <div class="small" id="blendLabel">L1 normal + L2 overlay</div>
+          </div>
+          <select id="blendMode" aria-label="Blend mode">
+            <option value="normal">normal</option>
+            <option value="add">add</option>
+            <option value="multiply">multiply</option>
+            <option value="screen">screen</option>
+            <option value="overlay" selected>overlay</option>
+            <option value="softlight">softlight</option>
+            <option value="hardlight">hardlight</option>
+            <option value="difference">difference</option>
+          </select>
+        </div>
+
+        <div class="ctrl">
+          <div class="full muted small" style="margin-top:6px;">Layer 1</div>
+
+          <label for="type1">Type</label>
+          <select id="type1">
+            <option value="perlin" selected>perlin</option>
+            <option value="value">value</option>
+            <option value="worley">worley (cellular)</option>
+            <option value="white">white</option>
+          </select>
+
+          <label for="oct1">Octaves</label>
+          <input id="oct1" type="number" min="1" max="10" step="1" value="5" />
+
+          <label for="gain1">Gain</label>
+          <div>
+            <input id="gain1" type="range" min="0" max="1" step="0.01" value="0.5" />
+            <div class="muted small" style="margin-top:6px;"><span id="gain1V">0.50</span></div>
+          </div>
+
+          <label for="lac1">Lacunarity</label>
+          <div>
+            <input id="lac1" type="range" min="1" max="4" step="0.01" value="2.0" />
+            <div class="muted small" style="margin-top:6px;"><span id="lac1V">2.00</span></div>
+          </div>
+
+          <label for="amp1">Opacity</label>
+          <div>
+            <input id="amp1" type="range" min="0" max="1" step="0.01" value="1" />
+            <div class="muted small" style="margin-top:6px;"><span id="amp1V">1.00</span></div>
+          </div>
+
+          <div class="full muted small" style="margin-top:10px;">Layer 2</div>
+
+          <label for="type2">Type</label>
+          <select id="type2">
+            <option value="perlin">perlin</option>
+            <option value="value">value</option>
+            <option value="worley" selected>worley (cellular)</option>
+            <option value="white">white</option>
+          </select>
+
+          <label for="oct2">Octaves</label>
+          <input id="oct2" type="number" min="1" max="10" step="1" value="3" />
+
+          <label for="gain2">Gain</label>
+          <div>
+            <input id="gain2" type="range" min="0" max="1" step="0.01" value="0.55" />
+            <div class="muted small" style="margin-top:6px;"><span id="gain2V">0.55</span></div>
+          </div>
+
+          <label for="lac2">Lacunarity</label>
+          <div>
+            <input id="lac2" type="range" min="1" max="4" step="0.01" value="2.2" />
+            <div class="muted small" style="margin-top:6px;"><span id="lac2V">2.20</span></div>
+          </div>
+
+          <label for="amp2">Opacity</label>
+          <div>
+            <input id="amp2" type="range" min="0" max="1" step="0.01" value="0.75" />
+            <div class="muted small" style="margin-top:6px;"><span id="amp2V">0.75</span></div>
+          </div>
+
+          <div class="full" style="margin-top:10px;border-top:1px solid var(--line2); padding-top:10px;"></div>
+
+          <div class="full row" style="gap:10px;">
+            <label class="muted small" style="display:flex;gap:8px;align-items:center;">
+              <input id="tile" type="checkbox" checked />
+              Tileable
+            </label>
+            <label class="muted small" style="display:flex;gap:8px;align-items:center;">
+              <input id="warp" type="checkbox" checked />
+              Domain warp
+            </label>
+            <label class="muted small" style="display:flex;gap:8px;align-items:center;">
+              <input id="dither" type="checkbox" />
+              Dither
+            </label>
+            <div class="spacer"></div>
+          </div>
+
+          <label for="warpAmt">Warp amount</label>
+          <div>
+            <input id="warpAmt" type="range" min="0" max="3" step="0.01" value="0.75" />
+            <div class="muted small" style="margin-top:6px;"><span id="warpAmtV">0.75</span></div>
+          </div>
+
+          <label for="palette">Palette</label>
+          <select id="palette">
+            <option value="gray" selected>gray</option>
+            <option value="neon">neon</option>
+            <option value="heat">heat</option>
+            <option value="ocean">ocean</option>
+            <option value="forest">forest</option>
+            <option value="bw">b/w (hard)</option>
+          </select>
+
+          <label for="contrast">Contrast</label>
+          <div>
+            <input id="contrast" type="range" min="0" max="3" step="0.01" value="1.15" />
+            <div class="muted small" style="margin-top:6px;"><span id="contrastV">1.15</span></div>
+          </div>
+
+          <label for="gamma">Gamma</label>
+          <div>
+            <input id="gamma" type="range" min="0.2" max="3" step="0.01" value="1.0" />
+            <div class="muted small" style="margin-top:6px;"><span id="gammaV">1.00</span></div>
+          </div>
+
+          <label for="poster">Posterize</label>
+          <div>
+            <input id="poster" type="range" min="0" max="64" step="1" value="0" />
+            <div class="muted small" style="margin-top:6px;"><span id="posterV">0</span></div>
+          </div>
+
+          <label for="vign">Vignette</label>
+          <div>
+            <input id="vign" type="range" min="0" max="2" step="0.01" value="0.35" />
+            <div class="muted small" style="margin-top:6px;"><span id="vignV">0.35</span></div>
+          </div>
+
+          <label for="inv">Invert</label>
+          <select id="inv">
+            <option value="0" selected>off</option>
+            <option value="1">on</option>
+          </select>
+
+          <div class="full" style="margin-top:12px;border-top:1px solid var(--line2); padding-top:12px;"></div>
+
+          <div class="full row" style="margin-top:0;">
+            <div class="muted small">JPG quality</div>
+            <div class="spacer"></div>
+            <div class="muted small"><span id="qV">0.92</span></div>
+          </div>
+          <div class="full">
+            <input id="q" type="range" min="0.3" max="1" step="0.01" value="0.92" style="width:100%;" />
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <a href="https://github.com/frietjewaterfiets" target="_blank" rel="noopener">frietjewaterfiets</a>
+    </footer>
+  </div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  const clamp01 = (x) => x < 0 ? 0 : (x > 1 ? 1 : x);
+  const lerp = (a,b,t) => a + (b-a)*t;
+  const smooth = (t) => t*t*(3-2*t);
+
+  function mulberry32(seed){
+    let a = seed >>> 0;
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function hash32(x){
+    x = (x ^ (x >>> 16)) >>> 0;
+    x = Math.imul(x, 0x7feb352d) >>> 0;
+    x = (x ^ (x >>> 15)) >>> 0;
+    x = Math.imul(x, 0x846ca68b) >>> 0;
+    x = (x ^ (x >>> 16)) >>> 0;
+    return x >>> 0;
+  }
+  function randFromInt(n){ return (hash32(n) >>> 0) / 4294967296; }
+
+  // -------------------------
+  // ZIP builder (STORE, fixed central-dir)
+  // -------------------------
+  const CRC_TABLE = (() => {
+    const tbl = new Uint32Array(256);
+    for (let i=0;i<256;i++){
+      let c = i;
+      for (let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      tbl[i] = c >>> 0;
+    }
+    return tbl;
+  })();
+
+  function crc32(buf){
+    let c = 0xFFFFFFFF;
+    for (let i=0;i<buf.length;i++){
+      c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+    }
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function u16(n){ const a = new Uint8Array(2); a[0]=n&255; a[1]=(n>>>8)&255; return a; }
+  function u32(n){ const a = new Uint8Array(4); a[0]=n&255; a[1]=(n>>>8)&255; a[2]=(n>>>16)&255; a[3]=(n>>>24)&255; return a; }
+  function strBytes(s){ return new TextEncoder().encode(s); }
+
+  function concat(parts){
+    let total = 0;
+    for (const p of parts) total += p.length;
+    const out = new Uint8Array(total);
+    let off = 0;
+    for (const p of parts){ out.set(p, off); off += p.length; }
+    return out;
+  }
+
+  function buildZip(files){
+    const localParts = [];
+    const centralParts = [];
+    let offset = 0;
+
+    for (const f of files){
+      const nameB = strBytes(f.name);
+      const data = f.data;
+      const crc = crc32(data);
+      const size = data.length;
+
+      // Local header
+      const localHeader = concat([
+        u32(0x04034b50),
+        u16(20),
+        u16(0),
+        u16(0),         // store
+        u16(0), u16(0), // time/date
+        u32(crc),
+        u32(size),
+        u32(size),
+        u16(nameB.length),
+        u16(0),
+        nameB
+      ]);
+
+      localParts.push(localHeader, data);
+
+      // Central header (CORRECT field count/order)
+      const centralHeader = concat([
+        u32(0x02014b50),
+        u16(20),        // ver made
+        u16(20),        // ver needed
+        u16(0),         // flag
+        u16(0),         // store
+        u16(0), u16(0), // time/date
+        u32(crc),
+        u32(size),
+        u32(size),
+        u16(nameB.length),
+        u16(0),         // extra len
+        u16(0),         // comment len
+        u16(0),         // disk start
+        u16(0),         // internal attr
+        u32(0),         // external attr
+        u32(offset),    // local header offset
+        nameB
+      ]);
+
+      centralParts.push(centralHeader);
+      offset += localHeader.length + data.length;
+    }
+
+    const centralDir = concat(centralParts);
+    const centralOffset = offset;
+    const centralSize = centralDir.length;
+
+    const end = concat([
+      u32(0x06054b50),
+      u16(0), u16(0),
+      u16(files.length),
+      u16(files.length),
+      u32(centralSize),
+      u32(centralOffset),
+      u16(0)
+    ]);
+
+    const zipData = concat([ concat(localParts), centralDir, end ]);
+    return new Blob([zipData], { type:'application/zip' });
+  }
+
+  // -------------------------
+  // Perlin / Value / Worley / FBM
+  // -------------------------
+  function buildPerm(seed){
+    const r = mulberry32(seed);
+    const p = new Uint16Array(256);
+    for (let i=0;i<256;i++) p[i]=i;
+    for (let i=255;i>0;i--){
+      const j = Math.floor(r()*(i+1));
+      const tmp=p[i]; p[i]=p[j]; p[j]=tmp;
+    }
+    const perm = new Uint16Array(512);
+    for (let i=0;i<512;i++) perm[i]=p[i&255];
+    return perm;
+  }
+  function grad2(h, x, y){
+    switch(h & 7){
+      case 0: return  x + y;
+      case 1: return -x + y;
+      case 2: return  x - y;
+      case 3: return -x - y;
+      case 4: return  x;
+      case 5: return -x;
+      case 6: return  y;
+      default:return -y;
+    }
+  }
+  function perlin2(x, y, perm, repeat){
+    let xi = Math.floor(x), yi = Math.floor(y);
+    let xf = x - xi, yf = y - yi;
+
+    if (repeat > 0){
+      xi = ((xi % repeat) + repeat) % repeat;
+      yi = ((yi % repeat) + repeat) % repeat;
+    }
+
+    const X = xi & 255, Y = yi & 255;
+    const u = smooth(xf), v = smooth(yf);
+
+    const aa = perm[perm[X] + Y];
+    const ab = perm[perm[X] + ((Y+1)&255)];
+    const ba = perm[perm[(X+1)&255] + Y];
+    const bb = perm[perm[(X+1)&255] + ((Y+1)&255)];
+
+    const x1 = lerp(grad2(aa, xf, yf),     grad2(ba, xf-1, yf),     u);
+    const x2 = lerp(grad2(ab, xf, yf-1),   grad2(bb, xf-1, yf-1),   u);
+    return lerp(x1, x2, v);
+  }
+
+  function value2(x, y, seed, repeat){
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+
+    let x0=xi, y0=yi, x1=xi+1, y1=yi+1;
+    if (repeat > 0){
+      x0 = ((x0 % repeat) + repeat) % repeat;
+      y0 = ((y0 % repeat) + repeat) % repeat;
+      x1 = ((x1 % repeat) + repeat) % repeat;
+      y1 = ((y1 % repeat) + repeat) % repeat;
+    }
+
+    const n00 = randFromInt(hash32((x0*73856093) ^ (y0*19349663) ^ (seed*83492791)));
+    const n10 = randFromInt(hash32((x1*73856093) ^ (y0*19349663) ^ (seed*83492791)));
+    const n01 = randFromInt(hash32((x0*73856093) ^ (y1*19349663) ^ (seed*83492791)));
+    const n11 = randFromInt(hash32((x1*73856093) ^ (y1*19349663) ^ (seed*83492791)));
+
+    const u = smooth(xf), v = smooth(yf);
+    const a = lerp(n00, n10, u);
+    const b = lerp(n01, n11, u);
+    return (lerp(a, b, v) * 2 - 1);
+  }
+
+  function worley2(x, y, seed, repeatCells){
+    const cx = Math.floor(x), cy = Math.floor(y);
+    let best = 1e9;
+
+    for (let oy=-1; oy<=1; oy++){
+      for (let ox=-1; ox<=1; ox++){
+        let ix = cx + ox, iy = cy + oy;
+
+        if (repeatCells > 0){
+          ix = ((ix % repeatCells) + repeatCells) % repeatCells;
+          iy = ((iy % repeatCells) + repeatCells) % repeatCells;
+        }
+
+        const h = hash32((ix*374761393) ^ (iy*668265263) ^ (seed*1442695041));
+        const rx = randFromInt(h);
+        const ry = randFromInt(h ^ 0x9e3779b9);
+
+        const fx = ix + rx;
+        const fy = iy + ry;
+
+        let dx = x - fx;
+        let dy = y - fy;
+
+        if (repeatCells > 0){
+          if (dx >  repeatCells/2) dx -= repeatCells;
+          if (dx < -repeatCells/2) dx += repeatCells;
+          if (dy >  repeatCells/2) dy -= repeatCells;
+          if (dy < -repeatCells/2) dy += repeatCells;
+        }
+
+        const d = dx*dx + dy*dy;
+        if (d < best) best = d;
+      }
+    }
+
+    const v = Math.sqrt(best);
+    return 1 - clamp01(v / 1.2);
+  }
+
+  function fbm2(sampleFn, x, y, oct, lac, gain){
+    let amp = 1, freq = 1;
+    let sum = 0, norm = 0;
+    for (let i=0;i<oct;i++){
+      const n = sampleFn(x*freq, y*freq);
+      sum += n * amp;
+      norm += amp;
+      amp *= gain;
+      freq *= lac;
+    }
+    return (norm > 0) ? (sum / norm) : 0;
+  }
+
+  // Palettes/effects
+  function paletteRGB(name, t){
+    t = clamp01(t);
+    if (name === 'bw'){ const v = t < 0.5 ? 0 : 1; return [v,v,v]; }
+    if (name === 'gray'){ return [t,t,t]; }
+    if (name === 'neon'){
+      const a=[0.02,0.02,0.04], b=[0.55,0.10,0.85], c=[0.05,0.95,0.95], d=[1,1,1];
+      if (t < 0.45){ const u=t/0.45; return [lerp(a[0],b[0],u), lerp(a[1],b[1],u), lerp(a[2],b[2],u)]; }
+      if (t < 0.85){ const u=(t-0.45)/0.40; return [lerp(b[0],c[0],u), lerp(b[1],c[1],u), lerp(b[2],c[2],u)]; }
+      const u=(t-0.85)/0.15; return [lerp(c[0],d[0],u), lerp(c[1],d[1],u), lerp(c[2],d[2],u)];
+    }
+    if (name === 'heat'){
+      const k=[0,0,0], r=[0.9,0.08,0.06], o=[1.0,0.55,0.10], y=[1.0,0.95,0.15], w=[1,1,1];
+      if (t < 0.35){ const u=t/0.35; return [lerp(k[0],r[0],u), lerp(k[1],r[1],u), lerp(k[2],r[2],u)]; }
+      if (t < 0.65){ const u=(t-0.35)/0.30; return [lerp(r[0],o[0],u), lerp(r[1],o[1],u), lerp(r[2],o[2],u)]; }
+      if (t < 0.88){ const u=(t-0.65)/0.23; return [lerp(o[0],y[0],u), lerp(o[1],y[1],u), lerp(o[2],y[2],u)]; }
+      const u=(t-0.88)/0.12; return [lerp(y[0],w[0],u), lerp(y[1],w[1],u), lerp(y[2],w[2],u)];
+    }
+    if (name === 'ocean'){
+      const a=[0.02,0.04,0.10], b=[0.05,0.22,0.70], c=[0.08,0.85,0.92], d=[0.90,0.98,1.00];
+      if (t < 0.55){ const u=t/0.55; return [lerp(a[0],b[0],u), lerp(a[1],b[1],u), lerp(a[2],b[2],u)]; }
+      if (t < 0.85){ const u=(t-0.55)/0.30; return [lerp(b[0],c[0],u), lerp(b[1],c[1],u), lerp(b[2],c[2],u)]; }
+      const u=(t-0.85)/0.15; return [lerp(c[0],d[0],u), lerp(c[1],d[1],u), lerp(c[2],d[2],u)];
+    }
+    if (name === 'forest'){
+      const a=[0.01,0.02,0.01], b=[0.06,0.30,0.10], c=[0.40,0.85,0.20], d=[0.95,1.00,0.90];
+      if (t < 0.5){ const u=t/0.5; return [lerp(a[0],b[0],u), lerp(a[1],b[1],u), lerp(a[2],b[2],u)]; }
+      if (t < 0.85){ const u=(t-0.5)/0.35; return [lerp(b[0],c[0],u), lerp(b[1],c[1],u), lerp(b[2],c[2],u)]; }
+      const u=(t-0.85)/0.15; return [lerp(c[0],d[0],u), lerp(c[1],d[1],u), lerp(c[2],d[2],u)];
+    }
+    return [t,t,t];
+  }
+
+  function blend(a,b,mode){
+    if (mode === 'normal') return b;
+    if (mode === 'add') return clamp01(a + b);
+    if (mode === 'multiply') return a*b;
+    if (mode === 'screen') return 1 - (1-a)*(1-b);
+    if (mode === 'difference') return Math.abs(a-b);
+    if (mode === 'overlay') return (a < 0.5) ? (2*a*b) : (1 - 2*(1-a)*(1-b));
+    if (mode === 'hardlight') return (b < 0.5) ? (2*a*b) : (1 - 2*(1-a)*(1-b));
+    if (mode === 'softlight') return (1-2*b)*a*a + 2*b*a;
+    return b;
+  }
+
+  function applyTone(v, contrast, gamma, invert){
+    let x = v;
+    x = (x - 0.5) * contrast + 0.5;
+    x = clamp01(x);
+    x = Math.pow(x, 1 / Math.max(0.0001, gamma));
+    x = clamp01(x);
+    if (invert) x = 1 - x;
+    return x;
+  }
+
+  function posterize(v, levels){
+    if (levels <= 1) return v;
+    return Math.round(v*(levels-1)) / (levels-1);
+  }
+
+  function vignetteFactor(x, y, amt){
+    if (amt <= 0) return 1;
+    const dx = (x-0.5), dy=(y-0.5);
+    const d = Math.sqrt(dx*dx + dy*dy);
+    const v = clamp01(1 - d*1.8);
+    return lerp(1, v, clamp01(amt));
+  }
+
+  function bayer8(x,y){
+    const M = [
+      [0,48,12,60,3,51,15,63],
+      [32,16,44,28,35,19,47,31],
+      [8,56,4,52,11,59,7,55],
+      [40,24,36,20,43,27,39,23],
+      [2,50,14,62,1,49,13,61],
+      [34,18,46,30,33,17,45,29],
+      [10,58,6,54,9,57,5,53],
+      [42,26,38,22,41,25,37,21],
+    ];
+    return (M[y&7][x&7] + 0.5) / 64;
+  }
+
+  // View
+  const view = { ox:0, oy:0, zoom:1 };
+  let dragging=false, lastX=0, lastY=0;
+
+  // DOM
+  const c = $('c');
+  const ctx = c.getContext('2d', { alpha:false, willReadFrequently:true });
+  const perf = $('perf');
+  const pxInfo = $('pxInfo');
+
+  const inputs = {
+    w:$('w'), h:$('h'),
+    scale:$('scale'), scaleV:$('scaleV'),
+    seed:$('seed'),
+    time:$('time'), timeV:$('timeV'),
+    speed:$('speed'), speedV:$('speedV'),
+
+    blendMode:$('blendMode'),
+    blendLabel:$('blendLabel'),
+
+    type1:$('type1'), oct1:$('oct1'),
+    gain1:$('gain1'), gain1V:$('gain1V'),
+    lac1:$('lac1'), lac1V:$('lac1V'),
+    amp1:$('amp1'), amp1V:$('amp1V'),
+
+    type2:$('type2'), oct2:$('oct2'),
+    gain2:$('gain2'), gain2V:$('gain2V'),
+    lac2:$('lac2'), lac2V:$('lac2V'),
+    amp2:$('amp2'), amp2V:$('amp2V'),
+
+    tile:$('tile'),
+    warp:$('warp'),
+    dither:$('dither'),
+    warpAmt:$('warpAmt'), warpAmtV:$('warpAmtV'),
+
+    palette:$('palette'),
+    contrast:$('contrast'), contrastV:$('contrastV'),
+    gamma:$('gamma'), gammaV:$('gammaV'),
+    poster:$('poster'), posterV:$('posterV'),
+    vign:$('vign'), vignV:$('vignV'),
+    inv:$('inv'),
+
+    q:$('q'), qV:$('qV'),
+  };
+
+  function syncLabels(){
+    inputs.scaleV.textContent = Number(inputs.scale.value).toFixed(1);
+    inputs.timeV.textContent  = Number(inputs.time.value).toFixed(1);
+    inputs.speedV.textContent = Number(inputs.speed.value).toFixed(2);
+
+    inputs.gain1V.textContent = Number(inputs.gain1.value).toFixed(2);
+    inputs.lac1V.textContent  = Number(inputs.lac1.value).toFixed(2);
+    inputs.amp1V.textContent  = Number(inputs.amp1.value).toFixed(2);
+
+    inputs.gain2V.textContent = Number(inputs.gain2.value).toFixed(2);
+    inputs.lac2V.textContent  = Number(inputs.lac2.value).toFixed(2);
+    inputs.amp2V.textContent  = Number(inputs.amp2.value).toFixed(2);
+
+    inputs.warpAmtV.textContent = Number(inputs.warpAmt.value).toFixed(2);
+    inputs.contrastV.textContent = Number(inputs.contrast.value).toFixed(2);
+    inputs.gammaV.textContent = Number(inputs.gamma.value).toFixed(2);
+    inputs.posterV.textContent = String(Number(inputs.poster.value));
+    inputs.vignV.textContent = Number(inputs.vign.value).toFixed(2);
+    inputs.qV.textContent = Number(inputs.q.value).toFixed(2);
+
+    inputs.blendLabel.textContent = `L1 normal + L2 ${inputs.blendMode.value}`;
+  }
+
+  function layerSample(type, x, y, t, seed, perm, tileRepeat){
+    if (type === 'white'){
+      const h = hash32((Math.floor(x*8192)*374761393) ^ (Math.floor(y*8192)*668265263) ^ (Math.floor(t*1000)*2246822519) ^ (seed*3266489917));
+      return randFromInt(h)*2-1;
+    }
+    if (type === 'value'){
+      return value2(x, y, seed, tileRepeat);
+    }
+    if (type === 'worley'){
+      const v = worley2(x, y, seed, tileRepeat);
+      return v*2-1;
+    }
+    return perlin2(x, y, perm, tileRepeat);
+  }
+
+  function makeLayerFn(layerType, oct, lac, gain, baseScale, seed, perm, tileOn, time, tScale){
+    const tileRepeat = tileOn ? Math.max(1, Math.round(baseScale)) : 0;
+
+    return (px, py) => {
+      const x = px / baseScale;
+      const y = py / baseScale;
+
+      const xt = x + time * tScale;
+      const yt = y - time * tScale * 0.73;
+
+      const sampler = (sx, sy) => layerSample(layerType, sx, sy, time, seed, perm, tileRepeat);
+      let n;
+
+      if (layerType === 'worley'){
+        const cells = tileOn ? tileRepeat : Math.max(2, Math.round(baseScale/2));
+        const wx = (px / c.width) * cells + time*tScale*0.2;
+        const wy = (py / c.height) * cells - time*tScale*0.15;
+        const ws = (sx,sy) => layerSample('worley', sx, sy, time, seed, perm, tileOn ? cells : 0);
+        n = fbm2(ws, wx, wy, oct, lac, gain);
+      } else {
+        n = fbm2(sampler, xt, yt, oct, lac, gain);
+      }
+      return n;
+    };
+  }
+
+  let raf = 0;
+  let auto = false;
+  let loop = false;
+  let lastT = performance.now();
+
+  let seqRunning = false;
+  let seqStopRequested = false;
+
+  function setCanvasSize(){
+    const w = Math.max(32, Math.min(4096, Number(inputs.w.value)||128));
+    const h = Math.max(32, Math.min(4096, Number(inputs.h.value)||128));
+    c.width = w; c.height = h;
+    pxInfo.textContent = `${w}×${h}`;
+  }
+
+  function renderOnce(){
+    syncLabels();
+    setCanvasSize();
+
+    const t0 = performance.now();
+
+    const w = c.width, h = c.height;
+
+    const seed = (Number(inputs.seed.value) >>> 0);
+    const perm1 = buildPerm(seed ^ 0xA5A5A5A5);
+    const perm2 = buildPerm(seed ^ 0x5A5A5A5A);
+
+    const baseScale = Math.max(0.5, Number(inputs.scale.value));
+    const time = Number(inputs.time.value);
+    const tileOn = inputs.tile.checked;
+    const warpOn = inputs.warp.checked;
+    const warpAmt = Number(inputs.warpAmt.value);
+
+    const l1 = makeLayerFn(
+      inputs.type1.value,
+      Math.max(1, Math.min(10, Number(inputs.oct1.value)||1)),
+      Number(inputs.lac1.value),
+      Number(inputs.gain1.value),
+      baseScale,
+      seed ^ 0x11111111,
+      perm1,
+      tileOn,
+      time,
+      0.12
+    );
+
+    const l2 = makeLayerFn(
+      inputs.type2.value,
+      Math.max(1, Math.min(10, Number(inputs.oct2.value)||1)),
+      Number(inputs.lac2.value),
+      Number(inputs.gain2.value),
+      baseScale * 0.85,
+      seed ^ 0x22222222,
+      perm2,
+      tileOn,
+      time,
+      0.10
+    );
+
+    const permW = buildPerm(seed ^ 0xC0FFEE);
+    const warpBaseRepeat = tileOn ? Math.max(1, Math.round(baseScale)) : 0;
+    const warpField = (x,y) => fbm2(
+      (sx,sy) => perlin2(sx, sy, permW, warpBaseRepeat),
+      x/(baseScale*0.9) + time*0.08,
+      y/(baseScale*0.9) - time*0.06,
+      4, 2.0, 0.55
+    );
+
+    const mode = inputs.blendMode.value;
+    const amp1 = Number(inputs.amp1.value);
+    const amp2 = Number(inputs.amp2.value);
+
+    const contrast = Number(inputs.contrast.value);
+    const gamma = Number(inputs.gamma.value);
+    const inv = inputs.inv.value === '1';
+    const poster = Number(inputs.poster.value);
+    const pal = inputs.palette.value;
+    const vign = Number(inputs.vign.value);
+    const ditherOn = inputs.dither.checked;
+
+    const img = ctx.createImageData(w, h);
+    const data = img.data;
+
+    const zoom = Math.max(0.05, view.zoom);
+    const ox = view.ox, oy = view.oy;
+
+    let p = 0;
+    for (let y=0; y<h; y++){
+      const yn = (h === 1) ? 0 : (y / (h-1));
+      for (let x=0; x<w; x++){
+        const xn = (w === 1) ? 0 : (x / (w-1));
+
+        let px = (x - w/2) / zoom + w/2 + ox;
+        let py = (y - h/2) / zoom + h/2 + oy;
+
+        if (warpOn && warpAmt > 0){
+          const wx = warpField(px, py);
+          const wy = warpField(px + 31.7, py - 19.3);
+          px += wx * warpAmt * baseScale * 0.85;
+          py += wy * warpAmt * baseScale * 0.85;
+        }
+
+        let n1 = (l1(px,py) * 0.5 + 0.5);
+        let n2 = (l2(px,py) * 0.5 + 0.5);
+
+        n1 = clamp01(n1) * amp1;
+        n2 = clamp01(n2) * amp2;
+
+        let n = blend(n1, n2, mode);
+        n = clamp01(n);
+
+        n = applyTone(n, contrast, gamma, inv);
+        if (poster >= 2) n = posterize(n, poster);
+
+        n *= vignetteFactor(xn, yn, vign);
+
+        if (ditherOn){
+          const d = bayer8(x,y) - 0.5;
+          n = clamp01(n + d * (1/255) * 42);
+        }
+
+        const rgb = paletteRGB(pal, n);
+        data[p++] = Math.round(rgb[0]*255);
+        data[p++] = Math.round(rgb[1]*255);
+        data[p++] = Math.round(rgb[2]*255);
+        data[p++] = 255;
+      }
+    }
+
+    ctx.putImageData(img, 0, 0);
+
+    const t1 = performance.now();
+    if (!seqRunning){
+      perf.innerHTML = `Rendered in <span class="status-ok">${(t1-t0).toFixed(1)}ms</span>`;
+    }
+  }
+
+  function tick(now){
+    const dt = (now - lastT) / 1000;
+    lastT = now;
+
+    if (auto){
+      const sp = Number(inputs.speed.value);
+      let t = Number(inputs.time.value) + dt * sp * 60;
+
+      if (loop){
+        // wrap 0..1000
+        while (t > 1000) t -= 1000;
+        while (t < 0) t += 1000;
+      } else {
+        t = Math.min(1000, Math.max(0, t));
+      }
+
+      inputs.time.value = t.toFixed(2);
+      renderOnce();
+    }
+
+    raf = requestAnimationFrame(tick);
+  }
+
+  async function downloadSingleJpg(){
+    const q = Number(inputs.q.value);
+    const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', q));
+    if (!blob) return;
+
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    a.download = `NOISE_LAB-${stamp}.jpg`;
+    a.href = URL.createObjectURL(blob);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+
+  // Sequence export
+  const seqBtn = $('seqBtn');
+  const downloadBtn = $('downloadJpgBtn');
+
+  function setSeqUI(running){
+    seqRunning = running;
+    seqBtn.textContent = running ? 'Stop' : 'Export Sequence ZIP';
+    downloadBtn.disabled = running;
+    $('autoBtn').disabled = running;
+    $('loopBtn').disabled = running;
+    $('randomBtn').disabled = running;
+    $('presetBtn').disabled = running;
+  }
+
+  function sleepFrame(){
+    return new Promise(r => requestAnimationFrame(() => r()));
+  }
+
+  function dataUrlToBytes(dataUrl){
+    const comma = dataUrl.indexOf(',');
+    const b64 = dataUrl.slice(comma + 1);
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  function canvasToJpegBytesSync(quality){
+    const url = c.toDataURL('image/jpeg', quality);
+    return dataUrlToBytes(url);
+  }
+
+  async function exportSequenceZip(){
+    if (seqRunning){
+      seqStopRequested = true;
+      return;
+    }
+
+    // auto off
+    auto = false;
+    const autoBtn = $('autoBtn');
+    autoBtn.textContent = 'Auto: off';
+    autoBtn.setAttribute('aria-pressed', 'false');
+
+    seqStopRequested = false;
+    setSeqUI(true);
+
+    inputs.time.value = '0.00';
+    syncLabels();
+    renderOnce();
+
+    const q = Number(inputs.q.value);
+    const files = [];
+    const started = performance.now();
+
+    for (let i = 1; i <= 1000; i++){
+      if (seqStopRequested) break;
+
+      inputs.time.value = String(i);
+      syncLabels();
+      renderOnce();
+      await sleepFrame();
+
+      const jpgBytes = canvasToJpegBytesSync(q);
+      files.push({ name: `${i}.jpg`, data: jpgBytes });
+
+      if (i % 25 === 0){
+        perf.innerHTML = `Sequence: <span class="status-ok">${i}</span>/1000 frames…`;
+        await sleepFrame();
+      }
+    }
+
+    perf.innerHTML = `Zipping <span class="status-ok">${files.length}</span> frames…`;
+    await sleepFrame();
+
+    const zipBlob = buildZip(files);
+
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+    a.download = `NOISE_SEQUENCE-${stamp}.zip`;
+    a.href = URL.createObjectURL(zipBlob);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+
+    const ended = performance.now();
+    perf.innerHTML = `Done: <span class="status-ok">${files.length}</span> frames in <span class="status-ok">${((ended-started)/1000).toFixed(1)}s</span>`;
+
+    setSeqUI(false);
+    seqStopRequested = false;
+  }
+
+  // Randomize + preset
+  function randInt(a,b){ return Math.floor(a + Math.random()*(b-a+1)); }
+  function randFloat(a,b){ return a + Math.random()*(b-a); }
+
+  function randomize(){
+    inputs.seed.value = randInt(0, 4294967295);
+    inputs.scale.value = randFloat(8, 120).toFixed(1);
+    inputs.type1.value = ['perlin','value','worley'][randInt(0,2)];
+    inputs.type2.value = ['perlin','value','worley','white'][randInt(0,3)];
+
+    inputs.oct1.value = randInt(2,7);
+    inputs.oct2.value = randInt(1,6);
+
+    inputs.gain1.value = randFloat(0.35,0.65).toFixed(2);
+    inputs.gain2.value = randFloat(0.35,0.70).toFixed(2);
+
+    inputs.lac1.value = randFloat(1.8,2.6).toFixed(2);
+    inputs.lac2.value = randFloat(1.6,3.0).toFixed(2);
+
+    inputs.amp1.value = randFloat(0.7,1.0).toFixed(2);
+    inputs.amp2.value = randFloat(0.35,0.95).toFixed(2);
+
+    inputs.blendMode.value = ['overlay','multiply','screen','softlight','difference','add'][randInt(0,5)];
+    inputs.palette.value = ['gray','neon','heat','ocean','forest'][randInt(0,4)];
+
+    inputs.warp.checked = Math.random() > 0.25;
+    inputs.warpAmt.value = randFloat(0.15, 1.4).toFixed(2);
+
+    inputs.contrast.value = randFloat(0.9, 1.7).toFixed(2);
+    inputs.gamma.value = randFloat(0.75, 1.35).toFixed(2);
+    inputs.vign.value = randFloat(0.0, 0.65).toFixed(2);
+
+    inputs.poster.value = (Math.random() > 0.75) ? randInt(4, 24) : 0;
+    inputs.dither.checked = (Number(inputs.poster.value) > 0) && (Math.random() > 0.4);
+    inputs.inv.value = (Math.random() > 0.9) ? '1' : '0';
+
+    renderOnce();
+  }
+
+  function presetCinematic(){
+    inputs.w.value = 128;
+    inputs.h.value = 128;
+
+    inputs.scale.value = 55;
+    inputs.seed.value = 1337;
+
+    inputs.type1.value = 'perlin';
+    inputs.oct1.value = 6;
+    inputs.gain1.value = 0.52;
+    inputs.lac1.value = 2.05;
+    inputs.amp1.value = 1.0;
+
+    inputs.type2.value = 'worley';
+    inputs.oct2.value = 3;
+    inputs.gain2.value = 0.55;
+    inputs.lac2.value = 2.2;
+    inputs.amp2.value = 0.78;
+
+    inputs.blendMode.value = 'overlay';
+    inputs.tile.checked = true;
+    inputs.warp.checked = true;
+    inputs.warpAmt.value = 0.75;
+
+    inputs.palette.value = 'ocean';
+    inputs.contrast.value = 1.18;
+    inputs.gamma.value = 1.02;
+    inputs.poster.value = 0;
+    inputs.dither.checked = false;
+    inputs.vign.value = 0.35;
+    inputs.inv.value = '0';
+
+    renderOnce();
+  }
+
+  // Events
+  function bindRange(el){
+    el.addEventListener('input', () => { syncLabels(); if (!auto && !seqRunning) renderOnce(); });
+    el.addEventListener('change', () => { syncLabels(); if (!auto && !seqRunning) renderOnce(); });
+  }
+
+  [
+    inputs.w, inputs.h, inputs.scale, inputs.seed, inputs.time,
+    inputs.type1, inputs.oct1, inputs.gain1, inputs.lac1, inputs.amp1,
+    inputs.type2, inputs.oct2, inputs.gain2, inputs.lac2, inputs.amp2,
+    inputs.tile, inputs.warp, inputs.dither, inputs.warpAmt,
+    inputs.palette, inputs.contrast, inputs.gamma, inputs.poster, inputs.vign, inputs.inv,
+    inputs.blendMode
+  ].forEach(el => {
+    el.addEventListener('input', () => { syncLabels(); if (!auto && !seqRunning) renderOnce(); });
+    el.addEventListener('change', () => { syncLabels(); if (!auto && !seqRunning) renderOnce(); });
+  });
+
+  [inputs.scale,inputs.time,inputs.speed,inputs.gain1,inputs.lac1,inputs.amp1,inputs.gain2,inputs.lac2,inputs.amp2,inputs.warpAmt,inputs.contrast,inputs.gamma,inputs.poster,inputs.vign,inputs.q].forEach(bindRange);
+
+  $('autoBtn').addEventListener('click', (e) => {
+    if (seqRunning) return;
+    auto = !auto;
+    e.currentTarget.textContent = `Auto: ${auto ? 'on' : 'off'}`;
+    e.currentTarget.setAttribute('aria-pressed', auto ? 'true' : 'false');
+    if (!auto) renderOnce();
+  });
+
+  $('loopBtn').addEventListener('click', (e) => {
+    if (seqRunning) return;
+    loop = !loop;
+    e.currentTarget.textContent = `Loop: ${loop ? 'on' : 'off'}`;
+    e.currentTarget.setAttribute('aria-pressed', loop ? 'true' : 'false');
+  });
+
+  $('randomBtn').addEventListener('click', () => { if (!seqRunning) randomize(); });
+  $('presetBtn').addEventListener('click', () => { if (!seqRunning) presetCinematic(); });
+
+  $('downloadJpgBtn').addEventListener('click', downloadSingleJpg);
+  $('seqBtn').addEventListener('click', exportSequenceZip);
+
+  $('resetViewBtn').addEventListener('click', () => {
+    if (seqRunning) return;
+    view.ox = 0; view.oy = 0; view.zoom = 1;
+    if (!auto) renderOnce();
+  });
+
+  c.addEventListener('wheel', (e) => {
+    if (seqRunning) return;
+    e.preventDefault();
+    const delta = Math.sign(e.deltaY);
+    const factor = (delta > 0) ? 1.08 : 0.92;
+    view.zoom = Math.max(0.05, Math.min(20, view.zoom * factor));
+    if (!auto) renderOnce();
+  }, { passive:false });
+
+  c.addEventListener('mousedown', (e) => {
+    if (seqRunning) return;
+    if (!e.shiftKey) return;
+    dragging = true;
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  window.addEventListener('mouseup', () => dragging=false);
+  window.addEventListener('mousemove', (e) => {
+    if (seqRunning) return;
+    if (!dragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+
+    view.ox -= dx / view.zoom;
+    view.oy -= dy / view.zoom;
+    if (!auto) renderOnce();
+  });
+
+  // init
+  syncLabels();
+  renderOnce();
+  raf = requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
