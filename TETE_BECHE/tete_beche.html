@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tête-bêche PDF Tool</title>
+  <style>
+    :root{
+      color-scheme: dark;
+      --bg:#000;
+      --fg:#fff;
+      --muted: rgba(255,255,255,.75);
+      --line: rgba(255,255,255,.35);
+      --accent:#ff00ff;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+
+    body{
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      background:var(--bg);
+      color:var(--fg);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      letter-spacing:.1px;
+    }
+
+    .wrap{
+      width:100%;
+      max-width:560px;
+      display:grid;
+      gap:16px;
+      text-align:center;
+    }
+
+    h1{
+      margin:0;
+      font-size:22px;
+      letter-spacing:.2px;
+    }
+
+    .meta,
+    .small{
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.5;
+    }
+
+    .drop{
+      border: 2px dashed var(--line);
+      border-radius: 0;
+      padding: 32px 24px;
+      text-align:center;
+      transition: 120ms ease;
+      user-select:none;
+      cursor:pointer;
+    }
+
+    .drop.drag{
+      border-color: var(--accent);
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+    }
+
+    input[type="file"]{
+      display:none;
+    }
+
+    button{
+      justify-self:center;
+      padding:10px 14px;
+      border-radius:0;
+      border:2px solid var(--line);
+      background:transparent;
+      color:var(--fg);
+      cursor:pointer;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      font-size: 12px;
+      min-width:180px;
+    }
+
+    button:hover{ border-color: var(--fg); }
+    button:disabled{ opacity:.5; cursor:not-allowed; }
+
+    .status{
+      min-height:20px;
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .footer-link-wrap{
+      margin-top: 8px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      text-align: left;
+    }
+
+    .footer-link{
+      color: var(--fg);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Tête-bêche PDF Tool</h1>
+    <div class="meta">Upload one PDF, then click the button to reverse the page order and rotate every page 180°.</div>
+
+    <label id="drop" class="drop" for="pdfFile">
+      <div style="font-size:18px; font-weight:600;">Drop your PDF here</div>
+      <div class="meta">or click to choose a file.</div>
+      <input id="pdfFile" type="file" accept="application/pdf" />
+    </label>
+
+    <button id="runBtn">Tête-bêche!</button>
+
+    <div id="status" class="status"></div>
+    <div class="small">This page uses pdf-lib from a CDN. Your PDF does NOT get uploaded anywhere.</div>
+    <div class="footer-link-wrap"><a class="footer-link" href="https://github.com/frietjewaterfiets" target="_blank" rel="noopener noreferrer">frietjewaterfiets</a></div>
+  </div>
+
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script>
+    const fileInput = document.getElementById('pdfFile');
+    const runBtn = document.getElementById('runBtn');
+    const statusEl = document.getElementById('status');
+    const drop = document.getElementById('drop');
+
+    function setStatus(msg) {
+      statusEl.textContent = msg;
+    }
+
+    function buildOutputName(name) {
+      const dot = name.lastIndexOf('.');
+      if (dot === -1) return name + '_tete_beche.pdf';
+      return name.slice(0, dot) + '_tete_beche' + name.slice(dot);
+    }
+
+    function updateSelectedFile() {
+      const file = fileInput.files && fileInput.files[0];
+      if (file) {
+        setStatus('Selected: ' + file.name);
+      } else {
+        setStatus('');
+      }
+    }
+
+    async function processPdf() {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) {
+        setStatus('Please choose a PDF file first.');
+        return;
+      }
+
+      if (!window.PDFLib) {
+        setStatus('pdf-lib failed to load. Check your internet connection and try again.');
+        return;
+      }
+
+      runBtn.disabled = true;
+      setStatus('Processing...');
+
+      try {
+        const inputBytes = new Uint8Array(await file.arrayBuffer());
+        const srcDoc = await PDFLib.PDFDocument.load(inputBytes);
+        const outDoc = await PDFLib.PDFDocument.create();
+
+        const pageCount = srcDoc.getPageCount();
+        const pageIndices = Array.from({ length: pageCount }, (_, i) => pageCount - 1 - i);
+        const copiedPages = await outDoc.copyPages(srcDoc, pageIndices);
+
+        for (const page of copiedPages) {
+          page.setRotation(PDFLib.degrees(180));
+          outDoc.addPage(page);
+        }
+
+        const outBytes = await outDoc.save();
+        const blob = new Blob([outBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = buildOutputName(file.name);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        setStatus('Done. Your converted PDF should be downloading now.');
+      } catch (err) {
+        console.error(err);
+        setStatus('Something went wrong while processing the PDF.');
+      } finally {
+        runBtn.disabled = false;
+      }
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      drop.addEventListener(eventName, event => {
+        event.preventDefault();
+        drop.classList.add('drag');
+      });
+    });
+
+    ['dragleave', 'dragend', 'drop'].forEach(eventName => {
+      drop.addEventListener(eventName, event => {
+        event.preventDefault();
+        drop.classList.remove('drag');
+      });
+    });
+
+    drop.addEventListener('drop', event => {
+      const files = event.dataTransfer && event.dataTransfer.files;
+      if (!files || !files.length) return;
+      const dt = new DataTransfer();
+      dt.items.add(files[0]);
+      fileInput.files = dt.files;
+      updateSelectedFile();
+    });
+
+    fileInput.addEventListener('change', updateSelectedFile);
+    runBtn.addEventListener('click', processPdf);
+  </script>
+</body>
+</html>
